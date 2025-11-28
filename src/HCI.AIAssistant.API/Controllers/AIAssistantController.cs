@@ -1,11 +1,11 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using HCI.AIAssistant.API.Models.DTOs;
+using Microsoft.AspNetCore.Mvc;
+
 using HCI.AIAssistant.API.Models.DTOs.AIAssistantController;
 using HCI.AIAssistant.API.Services;
-using Microsoft.AspNetCore.Mvc;
+using HCI.AIAssistant.API.Models.DTOs;
+using Newtonsoft.Json;
+using Microsoft.Azure.Devices;
+using System.Text;
 
 namespace HCI.AIAssistant.API.Controllers;
 
@@ -13,19 +13,25 @@ namespace HCI.AIAssistant.API.Controllers;
 [Route("api/[controller]")]
 public class AIAssistantController : ControllerBase
 {
+    private readonly ISecretsService _secretsService;
+    private readonly IAppConfigurationsService _appConfigurationsService;
     private readonly IAIAssistantService _aIAssistantService;
     private readonly IParametricFunctions _parametricFunctions;
 
     public AIAssistantController(
+        ISecretsService secretsService,
+        IAppConfigurationsService appConfigurationsService,
         IAIAssistantService aIAssistantService,
         IParametricFunctions parametricFunctions
     )
     {
+        _secretsService = secretsService;
+        _appConfigurationsService = appConfigurationsService;
         _aIAssistantService = aIAssistantService;
         _parametricFunctions = parametricFunctions;
     }
 
-    [HttpPost("/message")]
+    [HttpPost("message")]
     [ProducesResponseType(typeof(AIAssistantControllerPostMessageResponseDTO), 200)]
     [ProducesResponseType(typeof(ErrorResponseDTO), 400)]
     public async Task<ActionResult> PostMessage([FromBody] AIAssistantControllerPostMessageRequestDTO request)
@@ -50,6 +56,16 @@ public class AIAssistantController : ControllerBase
         {
             TextMessage = textMessageResponse
         };
+
+        string? ioTHubConnectionString = _secretsService?.IoTHubSecrets?.ConnectionString;
+        if (ioTHubConnectionString != null)
+        {
+            var serviceClientForIoTHub = ServiceClient.CreateFromConnectionString(ioTHubConnectionString);
+            var seralizedMessage = JsonConvert.SerializeObject(textMessageResponse);
+
+            var ioTMessage = new Message(Encoding.UTF8.GetBytes(seralizedMessage));
+            await serviceClientForIoTHub.SendAsync(_appConfigurationsService.IoTDeviceName, ioTMessage);
+        }
 
         return Ok(response);
     }

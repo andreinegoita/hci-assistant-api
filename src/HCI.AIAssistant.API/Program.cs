@@ -5,6 +5,21 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(name: "CORS",
+    policy =>
+    {
+        policy
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowAnyOrigin();
+    });
+});
+
+
+
+
 var keyVaultName = builder.Configuration[$"AppConfigurations{ConfigurationPath.KeyDelimiter}KeyVaultName"]; 
 var secretsPrefix = builder.Configuration[$"AppConfigurations{ConfigurationPath.KeyDelimiter}SecretsPrefix"];
  if (string.IsNullOrWhiteSpace(keyVaultName)) { throw new ArgumentNullException("KeyVaultName", "KeyVaultName is missing."); }
@@ -28,6 +43,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseCors("CORS");
 
 // Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
